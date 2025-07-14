@@ -12,7 +12,7 @@ I will continue my efforts to make C++ a nice language, by following these rules
   not both.
 - I will prefer structures over classes.
 - I will not use inheritance, except for the sparing use of interfaces, if absolutely required.
-- I will not use templates.
+- I will not make templates.
 - I will avoid `malloc` and his friends.
 - I will not define functions inside of structures.
 - I will never use the "new" keyword. 
