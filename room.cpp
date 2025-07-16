@@ -81,7 +81,7 @@ std::vector<Roomba> generateNRoombas(Room& room, int n, float radius) {
         // Generate a neural network where all the weights are 1.0
         NeuralNetworks::ActivationFunc f = &NeuralNetworks::sigmoidVec;
         NeuralNetworks::NeuralNetwork nn = NeuralNetworks::buildNeuralNetwork(layerSizes, f);
-
+        tweakNeuralNetwork(nn, 1.0, 20);
         int m = (int)(room.boundingBox.width/DUST_SPACING);
         int n = (int)(room.boundingBox.height/DUST_SPACING);
         std::vector<std::vector<bool>> dustPositions(m, std::vector<bool>(n, false));

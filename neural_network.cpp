@@ -2,19 +2,11 @@
 #include <stdexcept>
 #include <vector>
 #include <functional>
+#include <random>
 
 namespace NeuralNetworks {
 
 using ActivationFunc = std::function<std::vector<float>(std::vector<float>&)>;
-
-std::vector<float> coolTestFunction(const std::vector<float>& a) { 
-    std::vector<float> result;
-    result.reserve(a.size());
-    for (float val : a) {
-        result.push_back(val*val+val);
-    }
-    return result;
-}
 
 struct Layer {
     std::vector<float> weights;
@@ -51,6 +43,17 @@ NeuralNetwork buildNeuralNetwork(std::vector<int>& layerSizes, ActivationFunc& f
     }
     
     return (NeuralNetwork) { layers };   
+}
+
+void tweakNeuralNetwork(NeuralNetwork& nn, float mutationStrength, int mutationRate) {
+    float r;
+    for (int i =0; i < mutationRate; i++) {
+        r = static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(mutationStrength*2))) - mutationStrength;
+        std::uniform_real_distribution<float> distr(-mutationStrength, mutationStrength);
+        int pos1 = rand() % nn.layers.size();
+        int pos2 = rand() % nn.layers[pos1].weights.size();
+        nn.layers[pos1].weights[pos2] += r;
+    }
 }
 
 // Basic matrix operations that probably exist already in a library
