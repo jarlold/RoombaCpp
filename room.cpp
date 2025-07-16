@@ -7,13 +7,16 @@
 #include <vector>
 
 #define ROOMBA_SIZE 20
+#define NUM_MEMORY 4
 
 struct Roomba {
     Vector2 position;
     Vector2 velocity;
-    double bearing;
+    float bearing;
+    float speed;
     Color color;
     NeuralNetworks::NeuralNetwork neuralNetwork;
+    std::array<float, NUM_MEMORY> memory; // for storing traumatic events
 };
 
 struct Wall {
@@ -37,11 +40,11 @@ Color generateNiceColor() {
     return c;
 }
 
-Roomba buildRoomba(Vector2 position) {
+Roomba buildRoomba(Vector2 position, NeuralNetworks::NeuralNetwork& nn) {
     Vector2 velocity = {0.0, 0.0};
-    double bearing = GetRandomValue(0, 360) / (2*PI);
+    float bearing = GetRandomValue(0, 360) / (2*PI);
     Color color = generateNiceColor();    
-    Roomba r = {position, velocity, bearing, color};
+    Roomba r = {position, velocity, bearing, 25.0f, color, nn};
     return r;
 }
 
@@ -61,7 +64,12 @@ bool roombaInAWall(Room& room, Roomba& roomba) {
 
 std::vector<Roomba> generateNRoombas(Room& room, int n, float radius) {
     std::vector<Roomba> roombas(n);
+    std::vector<int> layerSizes = { 4 + NUM_MEMORY, 5, 6, 5, 4 + NUM_MEMORY };
     for (int i=0; i<n; i++) {
+        // Generate a neural network where all the weights are 1.0
+        NeuralNetworks::ActivationFunc f = &NeuralNetworks::sigmoidVec;
+        NeuralNetworks::NeuralNetwork nn = NeuralNetworks::buildNeuralNetwork(layerSizes, f);
+    
         // LETS GO GAMBLING!!!
         // TODO: Cast a ray instead and see if it intersects with a wall, if so
         // stop, move ROOMBA_SIZE backwards, and put the roomba there
@@ -72,7 +80,7 @@ std::vector<Roomba> generateNRoombas(Room& room, int n, float radius) {
                 (float) (GetRandomValue(-255, 255)/510.0f)
             };
             f = Vector2Scale(Vector2Normalize(f), GetRandomValue(-radius, radius));
-            roombas[i] = buildRoomba( (Vector2) {f.x, f.y} );
+            roombas[i] = buildRoomba( (Vector2) {f.x, f.y}, nn);
         } while ( roombaInAWall(room, roombas[i]) );
     }
     return roombas;
@@ -126,26 +134,54 @@ bool roombaOutOfRoom(Room& room, Roomba& roomba) {
     );
 }
 
-float getRoombaBearingAdjustment(Roomba& roomba) {
-    //TODO: Temporary placeholders, we'll have to make the roomba keep some metrics later
-    std::array<float, 4> inputData = { roomba.position.x, roomba.position.y, roomba.velocity.x, roomba.velocity.y };
+float getRoombaBearingAdjustment(Roomba& roomba, Room& room) {
+    /* Let's give the vaccum cleaners memories! Nothing could go wrong!
+       Give them memories then make them do chores for epochs and epochs!
+       Nothing bad can happen to this! Our actions have no consequences!
+    */
+    std::vector<float> inputData(4 + NUM_MEMORY);
+    for (int i = 0; i < NUM_MEMORY; i++) {
+        inputData[i] = roomba.memory[i];
+    }
     
-    return 0.0;
+    //TODO: Temporary placeholders, we'll have to make the roomba keep some metrics later
+    // Real roombas don't get to know their X and Y so easily so....
+    inputData[NUM_MEMORY+1] = roomba.position.x / (float) room.boundingBox.width;
+    inputData[NUM_MEMORY+2] = roomba.position.y / (float) room.boundingBox.height;
+    inputData[NUM_MEMORY+3] = roomba.velocity.x / (float) room.boundingBox.width;
+    inputData[NUM_MEMORY+4] = roomba.velocity.y / (float) room.boundingBox.height;
+    
+    // Do the forwards pass and get the data out
+    std::vector<float> output = NeuralNetworks::doPrediction(roomba.neuralNetwork, inputData);
+    float newBearing = output[NUM_MEMORY];
+    for (int i = 0; i < NUM_MEMORY; i++) {
+        roomba.memory[i] = output[i];
+    }
+    
+    // Clamp it between -n and +n
+    if (newBearing > PI)
+        newBearing = PI;
+    else if (newBearing < -PI)
+        newBearing = -PI;
+    
+    return newBearing;
 }
 
 void updateRoomba(Camera2D& camera, Roomba& roomba, Room& room, float dt) {
+    // Roomba will adjust his bearing based on the output of his neural network
+    roomba.bearing += getRoombaBearingAdjustment(roomba, room) * dt;
+    
+    // Make sure he's bearing isn't in some stupid range.
+    while (roomba.bearing > 2 * PI) roomba.bearing -= 2 * PI;
+    while (roomba.bearing < 0 ) roomba.bearing += 2 * PI;
+
     // Roomba will face friction
     roomba.velocity = Vector2Scale(roomba.velocity, 0.99);
     
-    // Roomba will accelerate towards the mouse as best he can
-    Vector2 accel = GetScreenToWorld2D(GetMousePosition(), camera);
-    accel = Vector2Subtract(roomba.position, accel);
-    accel = Vector2Normalize(accel);
-    
-    // TODO: The bearing should decide the direction, not the otherway around
-    roomba.bearing = atan2(roomba.velocity.y, roomba.velocity.x);
-    
-    accel = Vector2Scale(accel, -200);
+    // Roomba will accelerate in the direction of his bearing
+    Vector2 accel = (Vector2) { (float) cos(roomba.bearing), (float) sin(roomba.bearing) };
+    //accel = Vector2Normalize(accel);
+    accel = Vector2Scale(accel, roomba.speed);
     
     // We do a little frame numerical integration, it's called we do a little frame numerical integration
     roomba.velocity = Vector2Add(Vector2Scale(accel, dt), roomba.velocity);
