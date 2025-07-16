@@ -42,7 +42,6 @@ std::vector<float> noActivationVec(std::vector<float>& input) {
 
 NeuralNetwork buildNeuralNetwork(std::vector<int>& layerSizes, ActivationFunc& f) {
     int numLayers = layerSizes.size();
-    //ActivationFunc f = &sigmoidVec;
     std::vector<Layer> layers(numLayers-1);
     
     for (int i=0; i < numLayers-1; i++) {

@@ -4,10 +4,14 @@
 #include "rlgl.h"
 #include "raymath.h"
 #include "neural_network.cpp"
+
 #include <vector>
+#include <cmath>
+#include <climits> 
 
 #define ROOMBA_SIZE 20
 #define NUM_MEMORY 4
+#define DUST_SPACING 10
 
 struct Roomba {
     Vector2 position;
@@ -15,8 +19,12 @@ struct Roomba {
     float bearing;
     float speed;
     Color color;
+    long dirtEaten;
+    int roombaId;
     NeuralNetworks::NeuralNetwork neuralNetwork;
     std::array<float, NUM_MEMORY> memory; // for storing traumatic events
+    std::vector<std::vector<bool>> usedDustPositions; // there has to be a better way to do this, but this is how I did it in the
+                                         // original simulator.
 };
 
 struct Wall {
@@ -40,11 +48,15 @@ Color generateNiceColor() {
     return c;
 }
 
-Roomba buildRoomba(Vector2 position, NeuralNetworks::NeuralNetwork& nn) {
+Roomba buildRoomba(Vector2 position, NeuralNetworks::NeuralNetwork& nn, std::vector<std::vector<bool>>& dustPositions) {
     Vector2 velocity = {0.0, 0.0};
     float bearing = GetRandomValue(0, 360) / (2*PI);
-    Color color = generateNiceColor();    
-    Roomba r = {position, velocity, bearing, 25.0f, color, nn};
+    std::array<float, NUM_MEMORY> memories = {0};
+    Color color = generateNiceColor();
+    // My very advanced super safe totally not gonna collide id generating system   
+    int roombaId = GetRandomValue(INT_MIN, INT_MAX);
+    //std::vector<bool> dustPositions(dustPositionsSize, false);
+    Roomba r = {position, velocity, bearing, 25.0f, color, 0, roombaId, nn, memories, dustPositions};
     return r;
 }
 
@@ -69,10 +81,15 @@ std::vector<Roomba> generateNRoombas(Room& room, int n, float radius) {
         // Generate a neural network where all the weights are 1.0
         NeuralNetworks::ActivationFunc f = &NeuralNetworks::sigmoidVec;
         NeuralNetworks::NeuralNetwork nn = NeuralNetworks::buildNeuralNetwork(layerSizes, f);
+
+        int m = (int)(room.boundingBox.width/DUST_SPACING);
+        int n = (int)(room.boundingBox.height/DUST_SPACING);
+        std::vector<std::vector<bool>> dustPositions(m, std::vector<bool>(n, false));
     
         // LETS GO GAMBLING!!!
         // TODO: Cast a ray instead and see if it intersects with a wall, if so
         // stop, move ROOMBA_SIZE backwards, and put the roomba there
+        // otherwise we're gonna spend A LOT of time allocating dustPositions lol
         do {
             // Get a random position in a circle around 0,0 of radius whatever
             Vector2 f = {
@@ -80,7 +97,7 @@ std::vector<Roomba> generateNRoombas(Room& room, int n, float radius) {
                 (float) (GetRandomValue(-255, 255)/510.0f)
             };
             f = Vector2Scale(Vector2Normalize(f), GetRandomValue(-radius, radius));
-            roombas[i] = buildRoomba( (Vector2) {f.x, f.y}, nn);
+            roombas[i] = buildRoomba( (Vector2) {f.x, f.y}, nn, dustPositions);
         } while ( roombaInAWall(room, roombas[i]) );
     }
     return roombas;
@@ -89,6 +106,10 @@ std::vector<Roomba> generateNRoombas(Room& room, int n, float radius) {
 void drawRoomba(Roomba& r) {
     DrawCircleV(r.position, ROOMBA_SIZE, r.color);
     DrawCircle(r.position.x + cos(r.bearing)*10, r.position.y + sin(r.bearing)*10, ROOMBA_SIZE/5, RAYWHITE);
+    
+    // This is probably slow but i don't want to fiddle with buffers 
+    std::string s = std::to_string(r.dirtEaten);
+    DrawText(s.c_str(), r.position.x, r.position.y, 6, BLACK);
 }
 
 void drawRoombas(std::vector<Roomba>& roombas) {
@@ -137,7 +158,7 @@ bool roombaOutOfRoom(Room& room, Roomba& roomba) {
 float getRoombaBearingAdjustment(Roomba& roomba, Room& room) {
     /* Let's give the vaccum cleaners memories! Nothing could go wrong!
        Give them memories then make them do chores for epochs and epochs!
-       Nothing bad can happen to this! Our actions have no consequences!
+       Nothing bad can happen due to this! Our actions have no consequences!
     */
     std::vector<float> inputData(4 + NUM_MEMORY);
     for (int i = 0; i < NUM_MEMORY; i++) {
@@ -197,6 +218,27 @@ void updateRoomba(Camera2D& camera, Roomba& roomba, Room& room, float dt) {
     if (roombaOutOfRoom(room, roomba) || roombaInAWall(room, roomba)) {
         roomba.position.y -= roomba.velocity.y*dt;
         roomba.velocity.y = 0;
+    }
+    
+    
+    // Now we'll say there's bits of dirt at every spot in an N by N grid
+    // and when a roomba passes over such a spot he gets to eat it. Yum yum!
+    
+    // I forgot about the signs when I was setting this up, so we have to shift things
+    // to be positive. I think this should work.
+    float trueX = floor((roomba.position.x+room.boundingBox.width/2)/DUST_SPACING);
+    float trueY = floor((roomba.position.y + room.boundingBox.height/2)/DUST_SPACING);
+    
+    // But if it doesn't this will let me know when I screwed up. That and the segfault of
+    // course.
+    if (trueX < 0 || trueY < 0) {
+        roomba.color = RED;
+    }
+    
+    // Reward the roomba for finding unique dirt.
+    if(!roomba.usedDustPositions[trueX][trueY]) {
+        roomba.dirtEaten++; // Good boy roomba :D
+        roomba.usedDustPositions[trueX][trueY] = true;
     }
 }
 

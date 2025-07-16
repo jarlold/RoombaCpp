@@ -39,7 +39,7 @@ int main() {
     populateRoom(room, 1);
     
     // Let's make a roomba!
-    std::vector<Roomba> roombas = generateNRoombas(room, 4000, room.boundingBox.width/2);
+    std::vector<Roomba> roombas = generateNRoombas(room, 20, room.boundingBox.width/2);
     
     while (!WindowShouldClose()) {
         // Translate based on mouse right click
