@@ -18,7 +18,6 @@ void draw(Camera2D camera, std::vector<Roomba>& roombas, Room& room) {
         
         drawRoom(room);
         drawRoombas(roombas);
-        
     EndMode2D();
     EndDrawing();
 }
@@ -28,7 +27,7 @@ int main() {
     const int screenWidth = 800;
     const int screenHeight = 600;
     InitWindow(screenWidth, screenHeight, "Roomba CPP Version");
-
+    
     // Set up the camera
     Camera2D camera = { 0 };
     camera.zoom = 1.0f;

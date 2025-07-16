@@ -3,6 +3,7 @@
 #include "raylib.h"
 #include "rlgl.h"
 #include "raymath.h"
+#include "neural_network.cpp"
 #include <vector>
 
 #define ROOMBA_SIZE 20
@@ -12,6 +13,7 @@ struct Roomba {
     Vector2 velocity;
     double bearing;
     Color color;
+    NeuralNetworks::NeuralNetwork neuralNetwork;
 };
 
 struct Wall {
@@ -61,6 +63,8 @@ std::vector<Roomba> generateNRoombas(Room& room, int n, float radius) {
     std::vector<Roomba> roombas(n);
     for (int i=0; i<n; i++) {
         // LETS GO GAMBLING!!!
+        // TODO: Cast a ray instead and see if it intersects with a wall, if so
+        // stop, move ROOMBA_SIZE backwards, and put the roomba there
         do {
             // Get a random position in a circle around 0,0 of radius whatever
             Vector2 f = {
@@ -122,6 +126,13 @@ bool roombaOutOfRoom(Room& room, Roomba& roomba) {
     );
 }
 
+float getRoombaBearingAdjustment(Roomba& roomba) {
+    //TODO: Temporary placeholders, we'll have to make the roomba keep some metrics later
+    std::array<float, 4> inputData = { roomba.position.x, roomba.position.y, roomba.velocity.x, roomba.velocity.y };
+    
+    return 0.0;
+}
+
 void updateRoomba(Camera2D& camera, Roomba& roomba, Room& room, float dt) {
     // Roomba will face friction
     roomba.velocity = Vector2Scale(roomba.velocity, 0.99);
@@ -159,4 +170,6 @@ void updateRoombas(Camera2D& camera, std::vector<Roomba>& roombas, Room& room, f
         updateRoomba(camera, roombas[i], room, dt);
     }
 }
+
+
 
