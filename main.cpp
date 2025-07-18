@@ -2,6 +2,7 @@
 #include "rlgl.h"
 #include "raymath.h"
 #include "room.cpp"
+#include "neuroevolution.cpp"
 #include <vector>
 #include <cstdio>
 
