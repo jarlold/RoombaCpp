@@ -3,6 +3,7 @@
 #include "raymath.h"
 #include "room.cpp"
 #include "neuroevolution.cpp"
+#include "gui.cpp"
 #include <vector>
 #include <cstdio>
 
@@ -23,24 +24,60 @@ void draw(Camera2D camera, std::vector<Roomba>& roombas, Room& room) {
     EndDrawing();
 }
 
+int testRoomba(NeuroEvolution::Solution& roombaSolution) {
+    // We'll start by building a room.
+    Room room = buildRoom(800, 800);
+    populateRoom(room, 50, 0.2);
+    Vector2 pos = (Vector2) {0.0, 0.0};
+    
+    // Properly sized dust positions are required of course. We have to make them
+    // now since it requires room information.
+    int m = (int)(room.boundingBox.width/DUST_SPACING);
+    int n = (int)(room.boundingBox.height/DUST_SPACING);
+    std::vector<std::vector<bool>> dustPositions(m, std::vector<bool>(n, false));
+    
+    // Finally we can birth a roomba.
+    Roomba roomba = buildRoomba(pos, roombaSolution.neuralNetwork, dustPositions);
+    
+    // One must imagine Sisyphus happy.
+    for (int i=0; i < 120*60; i++) {
+        updateRoomba(roomba, room, 0.2);
+    }
+    
+    return roomba.dirtEaten;
+}
+
 int main() {
+    /*
+    // Make some roomba and evolve them or whatever kids do these days
+    std::vector<NeuroEvolution::Solution> sols = NeuroEvolution::generateNSolutions(5, 4+4, 10, 5, 10, 4+1);
+    NeuroEvolution::testSolutions(sols, testRoomba);
+    
+    for (int i =0; i < sols.size(); i++) {
+        printf("%d got %d dirts\r\n", i, sols[i].score);
+    }
+    
+    return 0;
+    */
+
+
     // Setup the window
-    const int screenWidth = 800;
-    const int screenHeight = 600;
+    const int screenWidth = 1000;
+    const int screenHeight = 1000;
     InitWindow(screenWidth, screenHeight, "Roomba CPP Version");
     
     // Set up the camera
     Camera2D camera = { 0 };
-    camera.zoom = 1.0f;
-    camera.target = {-screenWidth/2, -screenHeight/2};
+    camera.zoom = 0.9f;
+    camera.target = {-1.1 * screenWidth/2, -1.1*screenHeight/2};
     SetTargetFPS(60);
     
     // Make a room
     Room room = buildRoom(800.0, 800.0);
-    populateRoom(room, 1);
+    populateRoom(room, 10, 0.1);
     
-    // Let's make a roomba!
-    std::vector<Roomba> roombas = generateNRoombas(room, 20, room.boundingBox.width/2);
+    // Make some roombas
+    std::vector<Roomba> roombas = generateNRoombas(room, 200, 0);
     
     while (!WindowShouldClose()) {
         // Translate based on mouse right click
@@ -69,7 +106,7 @@ int main() {
         draw(camera, roombas, room);
         
         // Update the roombas
-        updateRoombas(camera, roombas, room, 1.0/60); 
+        updateRoombas(roombas, room, 1.0/60); 
     }
     
     CloseWindow();

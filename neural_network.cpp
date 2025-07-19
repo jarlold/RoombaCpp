@@ -12,6 +12,7 @@ struct Layer {
     std::vector<float> weights;
     int weightsWidth;
     ActivationFunc activationFunction;
+    //TODO: I forgot to add a bias shit
 };
 
 struct NeuralNetwork {
@@ -37,6 +38,8 @@ NeuralNetwork buildNeuralNetwork(std::vector<int>& layerSizes, ActivationFunc& f
     std::vector<Layer> layers(numLayers-1);
     
     for (int i=0; i < numLayers-1; i++) {
+        // No Xavier initialization because we won't be taking the gradient
+        // (this is ment for use in neuroevolution)
         std::vector<float> weights(layerSizes[i]*layerSizes[i+1], 1.0);
         int w = layerSizes[i+1];
         layers[i] = (Layer) {weights, w, f};
@@ -106,7 +109,7 @@ std::vector<float> doPrediction(NeuralNetwork& network, std::vector<float>& inpu
 
 void neuralNetworkTestCase() {
     // Test matrix math
-    printf("Running test case for matrix math...\r\n");
+    ("Running test case for matrix math...\r\n");
     std::vector<float> v = { 13, 14, 15 };
     std::vector<float> m = {
         1.0, 2.0,  3.0,  4.0,

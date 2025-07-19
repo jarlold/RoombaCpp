@@ -20,11 +20,10 @@ struct Roomba {
     float speed;
     Color color;
     long dirtEaten;
-    int roombaId;
     NeuralNetworks::NeuralNetwork neuralNetwork;
     std::array<float, NUM_MEMORY> memory; // for storing traumatic events
     std::vector<std::vector<bool>> usedDustPositions; // there has to be a better way to do this, but this is how I did it in the
-                                         // original simulator.
+                                                      // original simulator.
 };
 
 struct Wall {
@@ -54,9 +53,7 @@ Roomba buildRoomba(Vector2 position, NeuralNetworks::NeuralNetwork& nn, std::vec
     std::array<float, NUM_MEMORY> memories = {0};
     Color color = generateNiceColor();
     // My very advanced super safe totally not gonna collide id generating system   
-    int roombaId = GetRandomValue(INT_MIN, INT_MAX);
-    //std::vector<bool> dustPositions(dustPositionsSize, false);
-    Roomba r = {position, velocity, bearing, 25.0f, color, 0, roombaId, nn, memories, dustPositions};
+    Roomba r = {position, velocity, bearing, 25.0f, color, 0, nn, memories, dustPositions};
     return r;
 }
 
@@ -74,6 +71,7 @@ bool roombaInAWall(Room& room, Roomba& roomba) {
     return false;
 }
 
+// Mostly just for fun, not used for actualy genetic algorithm
 std::vector<Roomba> generateNRoombas(Room& room, int n, float radius) {
     std::vector<Roomba> roombas(n);
     std::vector<int> layerSizes = { 4 + NUM_MEMORY, 5, 6, 5, 4 + NUM_MEMORY };
@@ -98,7 +96,7 @@ std::vector<Roomba> generateNRoombas(Room& room, int n, float radius) {
             };
             f = Vector2Scale(Vector2Normalize(f), GetRandomValue(-radius, radius));
             roombas[i] = buildRoomba( (Vector2) {f.x, f.y}, nn, dustPositions);
-        } while ( roombaInAWall(room, roombas[i]) );
+        } while ( roombaInAWall(room, roombas[i]) && false);
     }
     return roombas;
 }
@@ -128,12 +126,43 @@ Room buildRoom(float width, float height) {
 }
 
 
-void populateRoom(Room& room, int n) {
-    for (int i=0; i<n; i++) {
-        Rectangle r = {room.boundingBox.x, room.boundingBox.y, room.boundingBox.width/4, room.boundingBox.height/4};
-        Wall new_wall = {r, SKYBLUE};
-        room.walls.push_back(new_wall);
+// Fill the room with walls until we had fillCapacity% full, or n walls. Whichever comes first.
+void populateRoom(Room& room, int n, float fillCapacity) {
+    std::vector<Wall> walls(n);
+    int done = 0;
+    int strides = 100;
+    int howManyX = floor(room.boundingBox.width/strides);
+    int howManyY = floor(room.boundingBox.height/strides);
+    int squiggleFactor = ROOMBA_SIZE * 3;
+    
+    for (int i=0; i < howManyX; i++) {
+        for (int j=0; j < howManyY; j++) {
+            if ( ((float)(rand() % (howManyX*howManyY) )) / (howManyX*howManyY) < fillCapacity ) {
+                Rectangle r = (Rectangle) { (float) strides*i, (float) strides*j, (float) strides, (float) strides};
+                
+                // Why on earth did I put this thing centered at the origin, its a hasstle!
+                r.x -= room.boundingBox.width/2;
+                r.y -= room.boundingBox.height/2;
+                
+                // Add a little bit of squiggle to it you know
+                float squiggleX = (rand() % squiggleFactor) - squiggleFactor/2;
+                r.x += squiggleX;
+                
+                float squiggleY = (rand() % squiggleFactor) - squiggleFactor/2;
+                r.y += squiggleY;
+                
+                // If a box hits (0,0) keep squiggling it until it isn't in (0,0)+Roomba Size anymore
+                
+                walls[done] = (Wall) {r, SKYBLUE};
+                done++;
+                if (done >= n) break;
+            }
+        }
+        
+        if (done >= n) break;
     }
+    
+    room.walls = walls;
 }
 
 void drawRoom(Room& room) {
@@ -179,6 +208,11 @@ float getRoombaBearingAdjustment(Roomba& roomba, Room& room) {
         roomba.memory[i] = output[i];
     }
     
+    // I only implemented sigmoid as my activation function so we'll just down
+    // shift it and call it tanh
+    newBearing -= 0.5;
+    newBearing *= 2;
+    
     // Clamp it between -n and +n
     if (newBearing > PI)
         newBearing = PI;
@@ -188,7 +222,7 @@ float getRoombaBearingAdjustment(Roomba& roomba, Room& room) {
     return newBearing;
 }
 
-void updateRoomba(Camera2D& camera, Roomba& roomba, Room& room, float dt) {
+void updateRoomba(Roomba& roomba, Room& room, float dt) {
     // Roomba will adjust his bearing based on the output of his neural network
     roomba.bearing += getRoombaBearingAdjustment(roomba, room) * dt;
     
@@ -234,7 +268,7 @@ void updateRoomba(Camera2D& camera, Roomba& roomba, Room& room, float dt) {
     if (trueX < 0 || trueY < 0) {
         roomba.color = RED;
     }
-    
+
     // Reward the roomba for finding unique dirt.
     if(!roomba.usedDustPositions[trueX][trueY]) {
         roomba.dirtEaten++; // Good boy roomba :D
@@ -242,12 +276,12 @@ void updateRoomba(Camera2D& camera, Roomba& roomba, Room& room, float dt) {
     }
 }
 
-void updateRoombas(Camera2D& camera, std::vector<Roomba>& roombas, Room& room, float dt) {
+
+void updateRoombas(std::vector<Roomba>& roombas, Room& room, float dt) {
     int b = roombas.size();
     for (int i=0; i< b; i++) {
-        updateRoomba(camera, roombas[i], room, dt);
+        updateRoomba(roombas[i], room, dt);
     }
 }
-
 
 
