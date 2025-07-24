@@ -19,6 +19,23 @@ struct NeuralNetwork {
     std::vector<Layer> layers;
 };
 
+// Function to create a deep copy of a NeuralNetwork
+NeuralNetwork deepCopyNeuralNetwork(const NeuralNetwork& original) {
+    NeuralNetwork copy;
+    copy.layers.reserve(original.layers.size()); // Reserve space for layers
+
+    for (const auto& layer : original.layers) {
+        Layer newLayer;
+        newLayer.weights = layer.weights; // Deep copy of weights
+        newLayer.weightsWidth = layer.weightsWidth;
+        newLayer.activationFunction = layer.activationFunction; // Copy the activation function
+
+        copy.layers.push_back(newLayer); // Add the new layer to the copy
+    }
+
+    return copy; // Return the deep copied NeuralNetwork
+}
+
 // Activation functions
 std::vector<float> sigmoidVec(std::vector<float>& input) {
     int m = input.size();
@@ -45,10 +62,20 @@ NeuralNetwork buildNeuralNetwork(std::vector<int>& layerSizes, ActivationFunc& f
         layers[i] = (Layer) {weights, w, f};
     }
     
-    return (NeuralNetwork) { layers };   
+    NeuralNetwork nn =  (NeuralNetwork) { layers };
+    
+    if (nn.layers.size() == 0) {
+        throw std::invalid_argument("Accidentally build a neural network with no layers.");
+    }
+    
+    return nn;
 }
 
 void tweakNeuralNetwork(NeuralNetwork& nn, float mutationStrength, int mutationRate) {
+    if (nn.layers.size() == 0) {
+        throw std::invalid_argument("Can't mutate a neural network with no layers.");
+    }
+    
     float r;
     for (int i =0; i < mutationRate; i++) {
         r = static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(mutationStrength*2))) - mutationStrength;

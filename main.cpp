@@ -40,31 +40,18 @@ int testRoomba(NeuroEvolution::Solution& roombaSolution) {
     Roomba roomba = buildRoomba(pos, roombaSolution.neuralNetwork, dustPositions);
     
     // One must imagine Sisyphus happy.
-    for (int i=0; i < 120*60; i++) {
-        updateRoomba(roomba, room, 0.2);
+    for (int i=0; i < 5*60*60; i++) {
+        updateRoomba(roomba, room, 1.0/60.0);
     }
     
     return roomba.dirtEaten;
 }
 
 int main() {
-    /*
-    // Make some roomba and evolve them or whatever kids do these days
-    std::vector<NeuroEvolution::Solution> sols = NeuroEvolution::generateNSolutions(5, 4+4, 10, 5, 10, 4+1);
-    NeuroEvolution::testSolutions(sols, testRoomba);
-    
-    for (int i =0; i < sols.size(); i++) {
-        printf("%d got %d dirts\r\n", i, sols[i].score);
-    }
-    
-    return 0;
-    */
-
-
     // Setup the window
     const int screenWidth = 1000;
-    const int screenHeight = 1000;
-    InitWindow(screenWidth, screenHeight, "Roomba CPP Version");
+    const int screenHeight = 900;
+    InitWindow(screenWidth, screenHeight, "Roomba Genetic System");
     
     // Set up the camera
     Camera2D camera = { 0 };
@@ -72,12 +59,39 @@ int main() {
     camera.target = {-1.1 * screenWidth/2, -1.1*screenHeight/2};
     SetTargetFPS(60);
     
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+    BeginMode2D(camera);
+        // This is probably slow but i don't want to fiddle with buffers 
+        std::string s = "Evolving some roombas, please wait...";
+        int hh = MeasureText(s.c_str(), 24);
+        DrawText(s.c_str(), -hh/2, -120, 24, BLACK);
+    EndMode2D();
+    EndDrawing();
+    
+    // Make some roomba and evolve them or whatever kids do these days
+    std::vector<NeuroEvolution::Solution> solutions = NeuroEvolution::findSolutions(
+        100,
+        15, 4+4, 10, 5, 10,4+1, 
+        testRoomba
+    );
+    
+    for (int i =0; i < solutions.size(); i++) {
+        printf("%d got %d dirts\r\n", i, solutions[i].score);
+    }
+    
     // Make a room
     Room room = buildRoom(800.0, 800.0);
     populateRoom(room, 10, 0.1);
     
     // Make some roombas
-    std::vector<Roomba> roombas = generateNRoombas(room, 200, 0);
+    std::vector<Roomba> roombas = generateNRoombas(room, solutions.size(), 0);
+    
+    // Replace their souls
+    int lsouls = solutions.size();
+    for (int i=0; i < lsouls; i++) {
+        roombas[i].neuralNetwork = solutions[i].neuralNetwork;
+    }
     
     while (!WindowShouldClose()) {
         // Translate based on mouse right click

@@ -57,50 +57,6 @@ Roomba buildRoomba(Vector2 position, NeuralNetworks::NeuralNetwork& nn, std::vec
     return r;
 }
 
-
-bool roombaInAWall(Room& room, Roomba& roomba) {
-    // Naive O(n^2) approach for bounds detection
-    for (Wall w : room.walls) {
-        if (
-            roomba.position.x + ROOMBA_SIZE > w.boundingBox.x &&
-            roomba.position.x - ROOMBA_SIZE < w.boundingBox.x + w.boundingBox.width &&
-            roomba.position.y + ROOMBA_SIZE > w.boundingBox.y && 
-            roomba.position.y - ROOMBA_SIZE < w.boundingBox.y + w.boundingBox.height 
-        ) return true;
-    }
-    return false;
-}
-
-// Mostly just for fun, not used for actualy genetic algorithm
-std::vector<Roomba> generateNRoombas(Room& room, int n, float radius) {
-    std::vector<Roomba> roombas(n);
-    std::vector<int> layerSizes = { 4 + NUM_MEMORY, 5, 6, 5, 4 + NUM_MEMORY };
-    for (int i=0; i<n; i++) {
-        // Generate a neural network where all the weights are 1.0
-        NeuralNetworks::ActivationFunc f = &NeuralNetworks::sigmoidVec;
-        NeuralNetworks::NeuralNetwork nn = NeuralNetworks::buildNeuralNetwork(layerSizes, f);
-        tweakNeuralNetwork(nn, 1.0, 20);
-        int m = (int)(room.boundingBox.width/DUST_SPACING);
-        int n = (int)(room.boundingBox.height/DUST_SPACING);
-        std::vector<std::vector<bool>> dustPositions(m, std::vector<bool>(n, false));
-    
-        // LETS GO GAMBLING!!!
-        // TODO: Cast a ray instead and see if it intersects with a wall, if so
-        // stop, move ROOMBA_SIZE backwards, and put the roomba there
-        // otherwise we're gonna spend A LOT of time allocating dustPositions lol
-        do {
-            // Get a random position in a circle around 0,0 of radius whatever
-            Vector2 f = {
-                (float) (GetRandomValue(-255, 255)/510.0f),
-                (float) (GetRandomValue(-255, 255)/510.0f)
-            };
-            f = Vector2Scale(Vector2Normalize(f), GetRandomValue(-radius, radius));
-            roombas[i] = buildRoomba( (Vector2) {f.x, f.y}, nn, dustPositions);
-        } while ( roombaInAWall(room, roombas[i]) && false);
-    }
-    return roombas;
-}
-
 void drawRoomba(Roomba& r) {
     DrawCircleV(r.position, ROOMBA_SIZE, r.color);
     DrawCircle(r.position.x + cos(r.bearing)*10, r.position.y + sin(r.bearing)*10, ROOMBA_SIZE/5, RAYWHITE);
@@ -128,7 +84,7 @@ Room buildRoom(float width, float height) {
 
 // Fill the room with walls until we had fillCapacity% full, or n walls. Whichever comes first.
 void populateRoom(Room& room, int n, float fillCapacity) {
-    std::vector<Wall> walls(n);
+    std::vector<Wall> walls;
     int done = 0;
     int strides = 100;
     int howManyX = floor(room.boundingBox.width/strides);
@@ -139,7 +95,6 @@ void populateRoom(Room& room, int n, float fillCapacity) {
         for (int j=0; j < howManyY; j++) {
             if ( ((float)(rand() % (howManyX*howManyY) )) / (howManyX*howManyY) < fillCapacity ) {
                 Rectangle r = (Rectangle) { (float) strides*i, (float) strides*j, (float) strides, (float) strides};
-                
                 // Why on earth did I put this thing centered at the origin, its a hasstle!
                 r.x -= room.boundingBox.width/2;
                 r.y -= room.boundingBox.height/2;
@@ -151,9 +106,12 @@ void populateRoom(Room& room, int n, float fillCapacity) {
                 float squiggleY = (rand() % squiggleFactor) - squiggleFactor/2;
                 r.y += squiggleY;
                 
-                // If a box hits (0,0) keep squiggling it until it isn't in (0,0)+Roomba Size anymore
+                // TODO: maybe put a box-box check here (instead of a point-box check) for a starting zone?
+                if ( 0 > i*strides && 0 < i*strides+strides && 0 > j*strides && 0 < j*strides+strides) {
+                    continue;
+                }
                 
-                walls[done] = (Wall) {r, SKYBLUE};
+                walls.push_back((Wall) {r, SKYBLUE} );
                 done++;
                 if (done >= n) break;
             }
@@ -168,7 +126,7 @@ void populateRoom(Room& room, int n, float fillCapacity) {
 void drawRoom(Room& room) {
     DrawRectangleRec(room.boundingBox, (Color) {0xe9, 0xe9, 0xe9, 0xff});
     for (Wall w : room.walls) {
-        DrawRectangleRec(w.boundingBox, WHITE);
+        DrawRectangleRec(w.boundingBox, w.color);
         DrawRectangleRoundedLinesEx(w.boundingBox, 0.05, 10, 4.0, BLACK);
     }
     DrawRectangleRoundedLinesEx(room.boundingBox, 0.01, 10, 4.0, BLACK);
@@ -182,6 +140,24 @@ bool roombaOutOfRoom(Room& room, Roomba& roomba) {
         roomba.position.y - ROOMBA_SIZE < room.boundingBox.y ||
         roomba.position.y + ROOMBA_SIZE > room.boundingBox.y + room.boundingBox.height
     );
+}
+
+bool roombaInAWall(Room& room, Roomba& roomba) {
+    // Naive O(n^2) approach for bounds detection
+    for (Wall& w : room.walls) {
+        if (
+            roomba.position.x + ROOMBA_SIZE > w.boundingBox.x &&
+            roomba.position.x - ROOMBA_SIZE < w.boundingBox.x + w.boundingBox.width &&
+            roomba.position.y + ROOMBA_SIZE > w.boundingBox.y && 
+            roomba.position.y - ROOMBA_SIZE < w.boundingBox.y + w.boundingBox.height 
+        ) {
+            w.color = RED;
+            return true;
+        } else {
+            //w.color = GREEN;
+        }
+    }
+    return false;
 }
 
 float getRoombaBearingAdjustment(Roomba& roomba, Room& room) {
@@ -226,7 +202,7 @@ void updateRoomba(Roomba& roomba, Room& room, float dt) {
     // Roomba will adjust his bearing based on the output of his neural network
     roomba.bearing += getRoombaBearingAdjustment(roomba, room) * dt;
     
-    // Make sure he's bearing isn't in some stupid range.
+    // Make sure his bearing isn't in some stupid range.
     while (roomba.bearing > 2 * PI) roomba.bearing -= 2 * PI;
     while (roomba.bearing < 0 ) roomba.bearing += 2 * PI;
 
@@ -235,7 +211,6 @@ void updateRoomba(Roomba& roomba, Room& room, float dt) {
     
     // Roomba will accelerate in the direction of his bearing
     Vector2 accel = (Vector2) { (float) cos(roomba.bearing), (float) sin(roomba.bearing) };
-    //accel = Vector2Normalize(accel);
     accel = Vector2Scale(accel, roomba.speed);
     
     // We do a little frame numerical integration, it's called we do a little frame numerical integration
@@ -276,12 +251,41 @@ void updateRoomba(Roomba& roomba, Room& room, float dt) {
     }
 }
 
-
 void updateRoombas(std::vector<Roomba>& roombas, Room& room, float dt) {
     int b = roombas.size();
     for (int i=0; i< b; i++) {
         updateRoomba(roombas[i], room, dt);
     }
+}
+
+// Mostly just for fun, not used for actualy genetic algorithm
+std::vector<Roomba> generateNRoombas(Room& room, int n, float radius) {
+    std::vector<Roomba> roombas(n);
+    std::vector<int> layerSizes = { 4 + NUM_MEMORY, 5, 6, 5, 4 + NUM_MEMORY };
+    for (int i=0; i<n; i++) {
+        // Generate a neural network where all the weights are 1.0
+        NeuralNetworks::ActivationFunc f = &NeuralNetworks::sigmoidVec;
+        NeuralNetworks::NeuralNetwork nn = NeuralNetworks::buildNeuralNetwork(layerSizes, f);
+        tweakNeuralNetwork(nn, 1.0, 20);
+        int m = (int)(room.boundingBox.width/DUST_SPACING);
+        int n = (int)(room.boundingBox.height/DUST_SPACING);
+        std::vector<std::vector<bool>> dustPositions(m, std::vector<bool>(n, false));
+    
+        // LETS GO GAMBLING!!!
+        // TODO: Cast a ray instead and see if it intersects with a wall, if so
+        // stop, move ROOMBA_SIZE backwards, and put the roomba there
+        // otherwise we're gonna spend A LOT of time allocating dustPositions lol
+        do {
+            // Get a random position in a circle around 0,0 of radius whatever
+            Vector2 f = {
+                (float) (GetRandomValue(-255, 255)/510.0f),
+                (float) (GetRandomValue(-255, 255)/510.0f)
+            };
+            f = Vector2Scale(Vector2Normalize(f), GetRandomValue(-radius, radius));
+            roombas[i] = buildRoomba( (Vector2) {f.x, f.y}, nn, dustPositions);
+        } while ( roombaInAWall(room, roombas[i]) && false);
+    }
+    return roombas;
 }
 
 

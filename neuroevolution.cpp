@@ -14,6 +14,7 @@ namespace NeuroEvolution {
         int numLayers = rand();
         numLayers = numLayers % numHiddenLayers;
         numLayers += 2;
+        
         std::vector<int> layerSizes(numLayers);
         layerSizes[0] = inputSize;
         layerSizes[numLayers-1] = outputSize;
@@ -43,8 +44,9 @@ namespace NeuroEvolution {
         std::vector<Solution> solutions(n);
         for (int i=0; i<n; i++) {
             Solution paul = generateSolution(inputSize, numHiddenLayers, minHiddenSize, maxHiddenSize, outputSize);
-            solutions.push_back(paul);
+            solutions[i] = paul;
         }
+        
         return solutions;
     }
     
@@ -58,6 +60,7 @@ namespace NeuroEvolution {
         // Roombas must face a trial to test the worth of their so(u)ls.
         int sols = solutions.size();
         for (int i =0; i < sols; i++) {
+            solutions[i].score = 0; // just in case
             solutions[i].score = scoringFunction(solutions[i]);
         }
         
@@ -78,16 +81,46 @@ namespace NeuroEvolution {
     
     // Sexy time, get busy (doing sex) (without a partner)
     Solution asexualReproduction(const Solution& solution) {
+        if (solution.neuralNetwork.layers.size() == 0) {
+            throw std::invalid_argument("A neural network without layers can't reproduce.");
+        }
+        
+        // This is the problem isn't it
         Solution sol2;
         sol2 = solution;
-        int f = sol2.neuralNetwork.layers[0].weights.size();
-        for (int i =0; i < f; i++) {
-            sol2.neuralNetwork.layers[0].weights[i] = 0;
-        }   
+        //sol2.neuralNetwork = NeuralNetworks::deepCopyNeuralNetwork(solution.neuralNetwork);
+        NeuralNetworks::tweakNeuralNetwork(sol2.neuralNetwork, 0.1, 5); 
         return sol2;
     }
     
     // Make Shinzo Abe proud~!
     Solution sexualReproduction(const Solution& solution);
-
+    
+    // The actual genetic algorithm or something like that probably not important
+    std::vector<Solution> findSolutions(
+        int iterations,
+        int n,
+        int inputSize,
+        int numHiddenLayers,
+        int minHiddenSize,
+        int maxHiddenSize,
+        int outputSize, 
+        std::function< int (Solution&)> scoringFunction
+    ) {
+        std::vector<Solution> initialSolutions = generateNSolutions(n, inputSize, numHiddenLayers, minHiddenSize, maxHiddenSize, outputSize);
+        
+        for (int i=0; i < iterations; i++) {
+            testSolutions(initialSolutions, scoringFunction);
+            doExtinction(initialSolutions, 0.2);
+            int l = initialSolutions.size()-1;
+            for (int i=l; i < n; i++) {
+                int luckyGuy = rand() % (l);
+                initialSolutions.push_back(
+                    asexualReproduction(initialSolutions[i])
+                );
+            }
+        }
+        
+        return initialSolutions;
+    }
 }
