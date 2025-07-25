@@ -27,7 +27,7 @@ namespace NeuroEvolution {
         }
         
         // Then do the um the like the the network and like yeah bro
-        NeuralNetworks::ActivationFunc f = &NeuralNetworks::sigmoidVec;
+        NeuralNetworks::ActivationFunc f = &NeuralNetworks::tanhVec;
         NeuralNetworks::NeuralNetwork nn = NeuralNetworks::buildNeuralNetwork(
             layerSizes,
             f
@@ -44,7 +44,7 @@ namespace NeuroEvolution {
         std::vector<Solution> solutions(n);
         for (int i=0; i<n; i++) {
             Solution paul = generateSolution(inputSize, numHiddenLayers, minHiddenSize, maxHiddenSize, outputSize);
-            solutions[i] = paul;
+            solutions[i] = paul; //idk paul for today
         }
         
         return solutions;
@@ -97,18 +97,13 @@ namespace NeuroEvolution {
     Solution sexualReproduction(const Solution& solution);
     
     // The actual genetic algorithm or something like that probably not important
-    std::vector<Solution> findSolutions(
-        int iterations,
-        int n,
-        int inputSize,
-        int numHiddenLayers,
-        int minHiddenSize,
-        int maxHiddenSize,
-        int outputSize, 
-        std::function< int (Solution&)> scoringFunction
+    std::vector<Solution> fitSolutions(
+        std::vector<Solution>& initialSolutions,
+        std::function< int (Solution&)> scoringFunction,
+        int iterations
     ) {
-        std::vector<Solution> initialSolutions = generateNSolutions(n, inputSize, numHiddenLayers, minHiddenSize, maxHiddenSize, outputSize);
-        
+        //std::vector<Solution> initialSolutions = generateNSolutions(n, inputSize, numHiddenLayers, minHiddenSize, maxHiddenSize, outputSize);
+        int n = initialSolutions.size();
         for (int i=0; i < iterations; i++) {
             testSolutions(initialSolutions, scoringFunction);
             doExtinction(initialSolutions, 0.2);

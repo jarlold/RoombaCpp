@@ -40,7 +40,7 @@ int testRoomba(NeuroEvolution::Solution& roombaSolution) {
     Roomba roomba = buildRoomba(pos, roombaSolution.neuralNetwork, dustPositions);
     
     // One must imagine Sisyphus happy.
-    for (int i=0; i < 5*60*60; i++) {
+    for (int i=0; i < 2*60*60; i++) {
         updateRoomba(roomba, room, 1.0/60.0);
     }
     
@@ -59,6 +59,7 @@ int main() {
     camera.target = {-1.1 * screenWidth/2, -1.1*screenHeight/2};
     SetTargetFPS(60);
     
+    // Draw a screen saying we're evolving roombas
     BeginDrawing();
     ClearBackground(RAYWHITE);
     BeginMode2D(camera);
@@ -70,15 +71,12 @@ int main() {
     EndDrawing();
     
     // Make some roomba and evolve them or whatever kids do these days
-    std::vector<NeuroEvolution::Solution> solutions = NeuroEvolution::findSolutions(
-        100,
-        15, 4+4, 10, 5, 10,4+1, 
-        testRoomba
+    std::vector<NeuroEvolution::Solution> solutions = NeuroEvolution::generateNSolutions(20, 4+4, 10, 5, 10, 4+1);
+    solutions = NeuroEvolution::fitSolutions(
+        solutions,
+        testRoomba,
+        100
     );
-    
-    for (int i =0; i < solutions.size(); i++) {
-        printf("%d got %d dirts\r\n", i, solutions[i].score);
-    }
     
     // Make a room
     Room room = buildRoom(800.0, 800.0);

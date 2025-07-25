@@ -3,6 +3,7 @@
 #include <vector>
 #include <functional>
 #include <random>
+#include <cmath>
 
 namespace NeuralNetworks {
 
@@ -41,10 +42,22 @@ std::vector<float> sigmoidVec(std::vector<float>& input) {
     int m = input.size();
     for (int i=0; i < m; i++) {
         // Fast sigmoid as recommended by a random stack overflow page
-        input[i] = input[i] / (1 + abs(input[i]));
+       // input[i] = input[i] / (1 + abs(input[i]));
+        
+        // Let's just use the real thing
+        input[i] =  1.0 / (1.0 + exp(-input[i]));
     }
     return input;
 }
+
+std::vector<float> tanhVec(std::vector<float>& input) {
+    int m = input.size();
+    for (int i=0; i < m; i++) {
+        input[i] = tanh(input[i]);
+    }
+    return input;
+}
+
 
 std::vector<float> noActivationVec(std::vector<float>& input) {
     return input;
@@ -58,6 +71,11 @@ NeuralNetwork buildNeuralNetwork(std::vector<int>& layerSizes, ActivationFunc& f
         // No Xavier initialization because we won't be taking the gradient
         // (this is ment for use in neuroevolution)
         std::vector<float> weights(layerSizes[i]*layerSizes[i+1], 1.0);
+        int bbbb = weights.size();
+        for (int j=0; j<bbbb; j++) {
+            weights[j] = ((float) (( (int) rand() ) % 100 ) - 50) / 100.0;
+        }
+        
         int w = layerSizes[i+1];
         layers[i] = (Layer) {weights, w, f};
     }
@@ -115,9 +133,9 @@ std::vector<float> vectorMatrixMultiplication(const std::vector<float>& vec, con
 }
 
 /*
-float tanh(std::vector<float>& input);
 float relu(std::vector<float>& input);
 float leakyRelu((std::vector<float>& input);
+wait why did i write leakyRelu??? I'm not differentiating this so it isn't helpful
 */
 
 std::vector<float> feedForwardLayer(Layer& layer, std::vector<float>& input) {

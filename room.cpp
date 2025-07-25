@@ -20,6 +20,9 @@ struct Roomba {
     float speed;
     Color color;
     long dirtEaten;
+    long collisions;
+    bool isColliding;
+    bool wasColliding;
     NeuralNetworks::NeuralNetwork neuralNetwork;
     std::array<float, NUM_MEMORY> memory; // for storing traumatic events
     std::vector<std::vector<bool>> usedDustPositions; // there has to be a better way to do this, but this is how I did it in the
@@ -53,12 +56,17 @@ Roomba buildRoomba(Vector2 position, NeuralNetworks::NeuralNetwork& nn, std::vec
     std::array<float, NUM_MEMORY> memories = {0};
     Color color = generateNiceColor();
     // My very advanced super safe totally not gonna collide id generating system   
-    Roomba r = {position, velocity, bearing, 25.0f, color, 0, nn, memories, dustPositions};
+    Roomba r = {position, velocity, bearing, 25.0f, color, 0, 0, false, false, nn, memories, dustPositions};
     return r;
 }
 
 void drawRoomba(Roomba& r) {
-    DrawCircleV(r.position, ROOMBA_SIZE, r.color);
+    if (r.isColliding) {
+        DrawCircleV(r.position, ROOMBA_SIZE, RED);
+    } else {
+        DrawCircleV(r.position, ROOMBA_SIZE, r.color);
+    }
+    
     DrawCircle(r.position.x + cos(r.bearing)*10, r.position.y + sin(r.bearing)*10, ROOMBA_SIZE/5, RAYWHITE);
     
     // This is probably slow but i don't want to fiddle with buffers 
@@ -106,8 +114,20 @@ void populateRoom(Room& room, int n, float fillCapacity) {
                 float squiggleY = (rand() % squiggleFactor) - squiggleFactor/2;
                 r.y += squiggleY;
                 
-                // TODO: maybe put a box-box check here (instead of a point-box check) for a starting zone?
-                if ( 0 > i*strides && 0 < i*strides+strides && 0 > j*strides && 0 < j*strides+strides) {
+                // Let's make that compiler earn his keep ok
+                int centreX = room.boundingBox.width/2; // i*strides + strides/2;
+                int centreY = room.boundingBox.height/2; //j*strides + strides/2;
+                int bX = i*strides;
+                int bY = j*strides;
+                
+                // If the roombas at the centre of the grid (should be 0,0) start in a wall, don't add
+                // that wall.
+                if ( (
+                    centreX + 2*ROOMBA_SIZE > bX &&
+                    centreX - 2*ROOMBA_SIZE < bX + strides &&
+                    centreY + 2*ROOMBA_SIZE > bY && 
+                    centreY - 2*ROOMBA_SIZE < bY + strides )
+                ) {
                     continue;
                 }
                 
@@ -151,10 +171,8 @@ bool roombaInAWall(Room& room, Roomba& roomba) {
             roomba.position.y + ROOMBA_SIZE > w.boundingBox.y && 
             roomba.position.y - ROOMBA_SIZE < w.boundingBox.y + w.boundingBox.height 
         ) {
-            w.color = RED;
             return true;
         } else {
-            //w.color = GREEN;
         }
     }
     return false;
@@ -172,8 +190,20 @@ float getRoombaBearingAdjustment(Roomba& roomba, Room& room) {
     
     //TODO: Temporary placeholders, we'll have to make the roomba keep some metrics later
     // Real roombas don't get to know their X and Y so easily so....
-    inputData[NUM_MEMORY+1] = roomba.position.x / (float) room.boundingBox.width;
-    inputData[NUM_MEMORY+2] = roomba.position.y / (float) room.boundingBox.height;
+    //inputData[NUM_MEMORY+1] = roomba.position.x / (float) room.boundingBox.width;
+    //inputData[NUM_MEMORY+2] = roomba.position.y / (float) room.boundingBox.height;
+    if (roomba.isColliding) {
+        inputData[NUM_MEMORY+1] = 1;
+    } else {
+        inputData[NUM_MEMORY+1] = -1;
+    }
+    
+    if (roomba.wasColliding) {
+        inputData[NUM_MEMORY+2] = 1;
+    } else {
+        inputData[NUM_MEMORY+2] = -1;
+    }
+    
     inputData[NUM_MEMORY+3] = roomba.velocity.x / (float) room.boundingBox.width;
     inputData[NUM_MEMORY+4] = roomba.velocity.y / (float) room.boundingBox.height;
     
@@ -217,18 +247,31 @@ void updateRoomba(Roomba& roomba, Room& room, float dt) {
     roomba.velocity = Vector2Add(Vector2Scale(accel, dt), roomba.velocity);
 
     // Update the roombas position, except if that takes him out of bounds then don't
+    // We'll also keep track of if he hits a wall in y or x update, so we can increment
+    // his collisions
+    bool xcol = false;
     roomba.position.x += roomba.velocity.x*dt;
     if (roombaOutOfRoom(room, roomba) || roombaInAWall(room, roomba)) {
         roomba.position.x -= roomba.velocity.x*dt;
         roomba.velocity.x = 0;
+        xcol = true;
     }
     
+    bool ycol = false;
     roomba.position.y += roomba.velocity.y*dt;
     if (roombaOutOfRoom(room, roomba) || roombaInAWall(room, roomba)) {
         roomba.position.y -= roomba.velocity.y*dt;
         roomba.velocity.y = 0;
+        ycol = true;
     }
     
+    // Increment when he hits the wall
+    roomba.isColliding = (ycol || xcol);
+    
+    if (roomba.isColliding && !roomba.wasColliding) {
+        roomba.collisions++;
+    }
+    roomba.wasColliding = roomba.isColliding;
     
     // Now we'll say there's bits of dirt at every spot in an N by N grid
     // and when a roomba passes over such a spot he gets to eat it. Yum yum!
