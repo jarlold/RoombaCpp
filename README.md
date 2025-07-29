@@ -2,6 +2,11 @@
 Like [RoombaSim](https://github.com/jarlold/RoombaSim) but in C++ with Raylib. To be honest, I'm mostly writing this to
 try out Raylib because it looks cool.
 
+## NOTICE: I AM NOT DUMB AND STUPID
+I KNOW HOW TO DO A BACKWARDS PASS ON A NEURAL NETWORK (IM NOT DUMB). I KNOW A LOT OF PEOPLE USE GENETIC ALGORITHMS BECAUSE
+THEY ARE TOO DUMB TO DO BACKWARDS PASSES BUT I'M NOT ONE OF THEM, YOU CAN SEE IN [THIS REPO](https://github.com/jarlold/SymbolicAlegbra)
+I MADE MY OWN AUTOGRAD SYSTEM (BECAUSE OF HOW NOT DUMB OR STUPID I AM). I JUST THINK GENETIC ALGORITHMS ARE COOL!
+
 ## Rules For C++
 I will continue my efforts to make C++ a nice language, by following these rules:
 - Headers are still annoying and I will instead group reflective types together in one file. Which if you think about it while drunk, is organic.
